@@ -1,7 +1,7 @@
-use std::str::FromStr;
+use std::{fmt::Display, str::FromStr};
 
 #[derive(Debug)]
-struct ChunkType {
+pub struct ChunkType {
     bytes: [u8; 4],
 }
 
@@ -9,7 +9,19 @@ impl FromStr for ChunkType {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() != 4 {
+            return Err(anyhow::anyhow!("string {} isn't four bytes long", s));
+        }
+
+        if !s
+            .chars()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_lowercase())
+        {
+            return Err(anyhow::anyhow!("bytes aren't in range [A-Z, a-z]"));
+        }
+
         let mut c = s.chars();
+
         Ok(ChunkType {
             bytes: [
                 c.next().unwrap() as u8,
@@ -18,6 +30,16 @@ impl FromStr for ChunkType {
                 c.next().unwrap() as u8,
             ],
         })
+    }
+}
+
+impl Display for ChunkType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for byte in self.bytes.iter() {
+            write!(f, "{}", *byte as char)?
+        }
+
+        Ok(())
     }
 }
 
@@ -42,28 +64,26 @@ impl ChunkType {
     }
 
     fn is_critical(&self) -> bool {
-        match self.bytes[0] & (1 << 5) {
-            1 => false,
-            0 => true,
-            _ => false,
-        }
+        (self.bytes[0] & (1 << 5)) == 0
     }
 
-    // TODO: change these to use the format in is_safe_to_copy
     fn is_public(&self) -> bool {
-        match self.bytes[1] & (1 << 5) {
-            1 => false,
-            0 => true,
-            _ => false,
-        }
+        (self.bytes[1] & (1 << 5)) == 0
     }
 
     fn is_reserved_bit_valid(&self) -> bool {
-        matches!(self.bytes[2] & (1 << 5), 0)
+        (self.bytes[2] & (1 << 5)) == 0
     }
 
     fn is_safe_to_copy(&self) -> bool {
         (self.bytes[3] & (1 << 5)) != 0
+    }
+
+    fn is_valid(&self) -> bool {
+        self.bytes()
+            .iter()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_lowercase())
+            && self.is_reserved_bit_valid()
     }
 }
 
@@ -135,33 +155,33 @@ mod tests {
         let chunk = ChunkType::from_str("RuST").unwrap();
         assert!(!chunk.is_safe_to_copy());
     }
-    //
-    // #[test]
-    // pub fn test_valid_chunk_is_valid() {
-    //     let chunk = ChunkType::from_str("RuSt").unwrap();
-    //     assert!(chunk.is_valid());
-    // }
-    //
-    // #[test]
-    // pub fn test_invalid_chunk_is_valid() {
-    //     let chunk = ChunkType::from_str("Rust").unwrap();
-    //     assert!(!chunk.is_valid());
-    //
-    //     let chunk = ChunkType::from_str("Ru1t");
-    //     assert!(chunk.is_err());
-    // }
-    //
-    // #[test]
-    // pub fn test_chunk_type_string() {
-    //     let chunk = ChunkType::from_str("RuSt").unwrap();
-    //     assert_eq!(&chunk.to_string(), "RuSt");
-    // }
-    //
-    // #[test]
-    // pub fn test_chunk_type_trait_impls() {
-    //     let chunk_type_1: ChunkType = TryFrom::try_from([82, 117, 83, 116]).unwrap();
-    //     let chunk_type_2: ChunkType = FromStr::from_str("RuSt").unwrap();
-    //     let _chunk_string = format!("{}", chunk_type_1);
-    //     let _are_chunks_equal = chunk_type_1 == chunk_type_2;
-    // }
+
+    #[test]
+    pub fn test_valid_chunk_is_valid() {
+        let chunk = ChunkType::from_str("RuSt").unwrap();
+        assert!(chunk.is_valid());
+    }
+
+    #[test]
+    pub fn test_invalid_chunk_is_valid() {
+        let chunk = ChunkType::from_str("Rust").unwrap();
+        assert!(!chunk.is_valid());
+
+        let chunk = ChunkType::from_str("Ru1t");
+        assert!(chunk.is_err());
+    }
+
+    #[test]
+    pub fn test_chunk_type_string() {
+        let chunk = ChunkType::from_str("RuSt").unwrap();
+        assert_eq!(&chunk.to_string(), "RuSt");
+    }
+
+    #[test]
+    pub fn test_chunk_type_trait_impls() {
+        let chunk_type_1: ChunkType = TryFrom::try_from([82, 117, 83, 116]).unwrap();
+        let chunk_type_2: ChunkType = FromStr::from_str("RuSt").unwrap();
+        let _chunk_string = format!("{}", chunk_type_1);
+        let _are_chunks_equal = chunk_type_1 == chunk_type_2;
+    }
 }
