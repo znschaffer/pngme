@@ -1,6 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
-#[derive(Debug,Clone)]
+#[derive(Debug)]
 pub struct ChunkType {
     bytes: [u8; 4],
 }
@@ -59,15 +59,15 @@ impl PartialEq for ChunkType {
 }
 
 impl ChunkType {
-    pub fn bytes(&self) -> [u8; 4] {
+    fn bytes(&self) -> [u8; 4] {
         self.bytes
     }
 
-    pub fn is_critical(&self) -> bool {
+    fn is_critical(&self) -> bool {
         (self.bytes[0] & (1 << 5)) == 0
     }
 
-    pub fn is_public(&self) -> bool {
+    fn is_public(&self) -> bool {
         (self.bytes[1] & (1 << 5)) == 0
     }
 
